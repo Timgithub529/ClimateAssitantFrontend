@@ -12,27 +12,6 @@ import { Col, Row, Grid } from 'react-native-easy-grid';
 const AuthContext = React.createContext();
 
 
- async function fetchApiCallPosts  ()  {
-const response =  await fetch("http://192.168.10.127:8080/customers/add", {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type':'application/json',
-    },
-     body: JSON.stringify({
-    name: 'Jonson',
-    surname: 'Wiener',  
-    email: 'lol@xd.de',
-    password: 'PWSUPER123',
-    job: 'BauArbeiter'
-    
-  })
-})
-  .then(res => res.json())
-  .then(res => console.log(res));
-
-}
-
 async function postAuthorizatedData(url = '', data = {} ) {
   // Default options are marked with *
   try{
@@ -260,12 +239,6 @@ function HomeScreen  ({ navigation }) {
 // Veraltet überarbeiten
 const prepare = async() => {
 
-  const log =  await deviceStorage.getItem("logged_in");
-  setShowTheThing(await deviceStorage.getItem("logged_in") == "true");
-  console.log(log );
-  deviceStorage.saveItem("logged_in", false);
-  return log
-
 }
 
   useEffect(() => {
@@ -284,6 +257,7 @@ const prepare = async() => {
           navigation.navigate('Login')
         }
           />
+
           <Button
         title="Go to Logout"
        onPress={() =>
@@ -330,7 +304,6 @@ const prepare = async() => {
 
 
 function RegisterScreen({ navigation })   {
-  const [loginPressed, setloginPressed] =  useState(true);
   let [mydata, setMydata] = React.useState({});
   const [data, setData] = useState([]);
 
@@ -338,12 +311,39 @@ function RegisterScreen({ navigation })   {
   const [surname, onChangeSurname] = React.useState("");
   const [email, onChangeEmail] = React.useState("");
   const [password, onChangePassword] = React.useState("");
+
   const [job, onChangeJob] = React.useState("");
+  const [jobList , setjobList] = useState([]);
   
 
+  const getProductList = async (url, method) => {
+    //const token = await deviceStorage.getItem('id_token');
+    try{
+    const response = await fetch(url, {
+
+      method: "GET",
+      headers: {
+        'Content-Type': 'application/json',
+        //'Authentication': `Bearer ${token}`
+      },
+    });
+      const json = await response.json();
+      method(json);
+      console.log("Test" + json)
+    } catch (err){
+      console.error(err);
+    }
+
+  };
+
+  const renderProductList = (list) => {
+    return list.map((product) => {
+      return <Picker.Item label={product.name} value={product.name} />
+    })
+  }
 
   useEffect(() => {
-  
+    getProductList("http://192.168.10.127:8080/api/fundprogram/jobs", setjobList);
   }, []);
 
   return (
@@ -355,9 +355,21 @@ function RegisterScreen({ navigation })   {
       <TextInput name = "surname" placeholder="Vorname"  onChangeText={onChangeSurname} value={surname}/>
       <TextInput name = "email" placeholder="Email"  onChangeText={onChangeEmail} value={email}/>
       <TextInput name = "password" placeholder="Password"  onChangeText={onChangePassword} value={password}/>
-      <TextInput name = "job" placeholder="Job/Branche"  onChangeText={onChangeJob} value={job}/>
+      <Picker
+          selectedValue={job}
+          style={{height: 40, width: 150}}
+          onValueChange={(itemValue, itemIndex) => {
+            onChangeJob(itemValue);
+            console.log(itemValue);
+          }}
+        >
+           <Picker.Item label='Job' value='*' ></Picker.Item>
+          { renderProductList(jobList)
+          }
+  
+        </Picker>
 
-      <Button onPress= {()=> {setloginPressed(false), postData("http://192.168.10.127:8080/api/customer/registration",{
+      <Button onPress= {()=> {postData("http://192.168.10.127:8080/api/customer/registration",{
     name: name,
     surname: surname,  
     email: email,
@@ -366,9 +378,8 @@ function RegisterScreen({ navigation })   {
     
   })
       }}
-      disabled= {!loginPressed}
 
-      title= {loginPressed ? "Login" : "Login pressed" }>
+      title= "Register" >
           </Button>
 
       <Button
@@ -522,15 +533,14 @@ function AdministrationScreen  ({ navigation }) {
       )
       
       }
-      <Button title='Fund Programm Löschen' onPress={() => {if(loeschIdB != null) { postAuthorizatedData("http://localhost:8080/api/fundprogram/programeraser",loeschName);}}} ></Button>
+      <Button title='Fund Programm Löschen' onPress={() => {if(loeschName != null) { deleteAuthorizatedData("http://localhost:8080/api/fundprogram/programeraser",{name: loeschName});}}} ></Button>
       <TextInput name = 'loeschName' placeholder='Fund Programm Name' onChangeText={onChangeLoeschName} value={loeschName}></TextInput>
-      <Button title='Benutzer Löschen' onPress={() => {if(loeschIdB != null) { postAuthorizatedData("http://localhost:8080/api/admin/deregistration",loeschEmailB);}}} ></Button>
+      <Button title='Benutzer Löschen' onPress={() => {if(loeschEmailB != null) { deleteAuthorizatedData("http://localhost:8080/api/admin/deregistration",{email: loeschEmailB});}}} ></Button>
       <TextInput name = 'loeschEmailB' placeholder='Benutzer Email' onChangeText={onChangeEmailB} value={loeschEmailB}></TextInput>
 
       </View>
   );
 };
-
 
 function ProjectsScreen  ({ navigation }) {
   const [favorites, setFavorites] = useState([]);
@@ -554,38 +564,33 @@ function ProjectsScreen  ({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-
+    <View style={styles.Container}>
       <Grid>
       {favorites.length > 0 ? (
         <Row style = {styles.listHeader} >  
-        <Col ><Text style={styles.item2} >Favoriten </Text> </Col>
+        <Col ><Text style={styles.item2} >Favoriten</Text></Col>
         <Col ><Text style={styles.item2} >Name</Text></Col>
-        <Col ><Text style={styles.item2} > Foerdersumme </Text></Col>
-        <Col ><Text style={styles.item2} >Foederbeschreibung </Text> </Col>
+        <Col ><Text style={styles.item2} >Foerdersumme</Text></Col>
+        <Col ><Text style={styles.item2} >Foederbeschreibung</Text></Col>
       </Row>
-
       ) : (
         <>
         
         </>
       )}
       
-       
-      <FlatList
+       <FlatList
           data={favorites}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
     
-        <Row style = {styles.listCell} > 
+        <Row style = {styles.listCell} >
         <Col ><Button title='Entfernen' onPress={() => { Remove(item.id);}} value={item.id}></Button></Col>
         <Col ><Text style={styles.item2} >{item.name} </Text></Col>
         <Col ><Text style={styles.item2} > {item.foerdersumme} </Text></Col>
-        <Col ><Text style={styles.item2} >{item.description} </Text> </Col>
-        
+        <Col ><Text style={styles.item2} >{item.description} </Text></Col>
         </Row>
       
-      /**{item.name}, {item.foerdersumme}, {item.foederart}, {item.foederbeschreibung} */
           )}
         />
        </Grid>
@@ -647,8 +652,6 @@ function OverviewScreen  ({ navigation }) {
       console.log('Link');
       console.log(mySearchData);
 
-     // "{\"keyword\": \"Zuschuss\", \"sector\": \"Energieeffizienz und Erneuerbare Energien\", \"type\": \"Zuschuss\", \"job\": false}"
-
      const response =  await postAuthorizatedData(link, mySearchData);
      const json =await response.json();
      setData(json);
@@ -658,9 +661,6 @@ function OverviewScreen  ({ navigation }) {
         console.log(error);
     }
      
-    //setLoading(false);
-  
-     // <Button title='Suchen' onPress={Search("keyword: " + {search} )}></Button>
  }
 
  //const [favorID, setFavorID] = React.useState(0);
@@ -714,10 +714,10 @@ function OverviewScreen  ({ navigation }) {
     <Grid>
       {data.length > 0 ? (
          <Row style = {styles.listHeader} >  
-        <Col ><Text style={styles.item2} >Favorisieren </Text> </Col>
+        <Col ><Text style={styles.item2} >Favorisieren</Text></Col>
         <Col ><Text style={styles.item2} >Name</Text></Col>
-        <Col ><Text style={styles.item2} > Foerdersumme </Text></Col>
-        <Col ><Text style={styles.item2} >Foederbeschreibung </Text> </Col>
+        <Col ><Text style={styles.item2} >Foerdersumme</Text></Col>
+        <Col ><Text style={styles.item2} >Foederbeschreibung</Text></Col>
       </Row>
       ) :(
         <>
@@ -733,11 +733,10 @@ function OverviewScreen  ({ navigation }) {
         <Col ><Button title='Favorisieren' onPress={() => { Favorite(item.id);}} value={item.id}></Button></Col>
         <Col ><Text style={styles.item2} >{item.name} </Text></Col>
         <Col ><Text style={styles.item2} > {item.foerdersumme} </Text></Col>
-        <Col ><Text style={styles.item2} >{item.description} </Text> </Col>
+        <Col ><Text style={styles.item2} >{item.description} </Text></Col>
         
         </Row>
       
-      /**{item.name}, {item.foerdersumme}, {item.foederart}, {item.foederbeschreibung} */
           )}
         />
        </Grid>
@@ -750,7 +749,6 @@ function OverviewScreen  ({ navigation }) {
 const Stack = createNativeStackNavigator();
 
 function App() {
-  
 
   const [state, dispatch] = React.useReducer(
     (prevState, action) => {
@@ -787,8 +785,6 @@ function App() {
       role: null,
     }
   );
-   
-
 
   React.useEffect(() => {
 
@@ -861,7 +857,6 @@ function App() {
  
   return (
     <AuthContext.Provider value={authContext}>
-    
     <NavigationContainer>
       <Stack.Navigator>
       {console.log("Selecting " + state.role  )}
@@ -873,7 +868,6 @@ function App() {
           </>
         ) : (
          <>
-          {console.log("Selecting " + state.role  )}
           {state.role == "[ROLE_ADMIN]" ? (
             <>
             <Stack.Screen name="Home" component={HomeScreen} />
@@ -895,7 +889,6 @@ function App() {
          </> 
          
         )}
-        
  
       </Stack.Navigator>
     </NavigationContainer>
